@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Mic Capture</title></head>
+<body>
+<script>
+  let mediaStream = null
+  let audioContext = null
+  let workletNode = null
+
+  // Register the AudioWorklet processor inline using a Blob URL
+  const processorCode = `
+    class PCMProcessor extends AudioWorkletProcessor {
+      constructor() {
+        super()
+        this._buffer = []
+        this._bufferSize = 0
+        // Send ~250ms of audio at 16kHz = 4000 samples
+        this._targetSamples = 4000
+      }
+
+      process(inputs) {
+        const input = inputs[0]
+        if (!input || !input[0]) return true
+
+        const float32 = input[0]
+        const sampleRate = globalThis.sampleRate || 48000
+        const ratio = sampleRate / 16000
+
+        // Downsample to 16kHz and convert to int16
+        const outLen = Math.floor(float32.length / ratio)
+        const samples = new Int16Array(outLen)
+        for (let i = 0; i < outLen; i++) {
+          const srcIdx = Math.floor(i * ratio)
+          const s = Math.max(-1, Math.min(1, float32[srcIdx]))
+          samples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+        }
+
+        this._buffer.push(samples)
+        this._bufferSize += samples.length
+
+        if (this._bufferSize >= this._targetSamples) {
+          // Merge and send
+          const merged = new Int16Array(this._bufferSize)
+          let offset = 0
+          for (const chunk of this._buffer) {
+            merged.set(chunk, offset)
+            offset += chunk.length
+          }
+          this.port.postMessage(merged.buffer, [merged.buffer])
+          this._buffer = []
+          this._bufferSize = 0
+        }
+
+        return true
+      }
+    }
+    registerProcessor('pcm-processor', PCMProcessor)
+  `
+
+  window.micBridge.onStartMic(async () => {
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      })
+      console.log('Permission granted: media')
+
+      audioContext = new AudioContext()
+      const blob = new Blob([processorCode], { type: 'application/javascript' })
+      const url = URL.createObjectURL(blob)
+      await audioContext.audioWorklet.addModule(url)
+      URL.revokeObjectURL(url)
+
+      const source = audioContext.createMediaStreamSource(mediaStream)
+      workletNode = new AudioWorkletNode(audioContext, 'pcm-processor')
+
+      workletNode.port.onmessage = (e) => {
+        const pcmBuffer = e.data
+        if (pcmBuffer && pcmBuffer.byteLength > 0) {
+          window.micBridge.sendAudioData(new Uint8Array(pcmBuffer))
+        }
+      }
+
+      source.connect(workletNode)
+      // AudioWorklet doesn't need to connect to destination
+      workletNode.connect(audioContext.destination)
+
+      console.log('AudioWorklet started, sample rate:', audioContext.sampleRate)
+      window.micBridge.micReady()
+    } catch (err) {
+      console.error('Mic start error:', err)
+      window.micBridge.micError(err.message)
+    }
+  })
+
+  window.micBridge.onStopMic(() => {
+    if (workletNode) { workletNode.disconnect(); workletNode = null }
+    if (audioContext) { audioContext.close().catch(() => {}); audioContext = null }
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null }
+  })
+</script>
+</body>
+</html>

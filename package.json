@@ -1,0 +1,42 @@
+{
+  "name": "cluemind-desktop",
+  "version": "1.0.0",
+  "description": "ClueMind AI Assistant - Real-time AI assistant for meetings, interviews, and screen analysis",
+  "main": "./out/main/index.js",
+  "author": "ClueMind",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build && electron-builder",
+    "start": "electron-vite preview",
+    "preview": "electron-vite preview"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "node-record-lpcm16": "^1.0.1",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-vite": "^2.0.0",
+    "electron-builder": "^24.9.1",
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0"
+  },
+  "build": {
+    "appId": "com.cluemind.assistant",
+    "productName": "ClueMind AI Assistant",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
