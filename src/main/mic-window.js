@@ -17,8 +17,13 @@ function createMicWindow() {
   micWindow = new BrowserWindow({
     width: 1,
     height: 1,
-    show: false,
+    x: -10000,
+    y: -10000,
+    show: true,
+    frame: false,
+    transparent: true,
     skipTaskbar: true,
+    focusable: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -27,6 +32,12 @@ function createMicWindow() {
       preload: path.join(__dirname, '../preload/mic.js')
     }
   })
+  // Keep it out of the user's way while still allowing getDisplayMedia to start.
+  micWindow.setIgnoreMouseEvents(true)
+  micWindow.setContentProtection(true)
+  micWindow.setSkipTaskbar(true)
+  // Do not float above everything - reduces chance of appearing in shares
+  micWindow.setAlwaysOnTop(false)
 
   if (process.env.ELECTRON_RENDERER_URL) {
     micWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/mic/index.html`)
@@ -38,33 +49,45 @@ function createMicWindow() {
     micWindow = null
   })
 
+  let crashCount = 0
   micWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('Mic window renderer crashed:', details.reason)
     micWindow = null
-    // Auto-restart mic capture after crash
-    setTimeout(() => {
-      console.log('Restarting mic capture after crash...')
-      startMicCapture()
-    }, 1000)
+    crashCount++
+    if (crashCount <= 3) {
+      setTimeout(() => {
+        console.log(`Restarting mic capture after crash (attempt ${crashCount}/3)...`)
+        startMicCapture()
+      }, 1000 * crashCount)
+    } else {
+      console.error('Mic window crashed too many times, giving up')
+    }
   })
 
   return micWindow
 }
 
 /**
- * Start microphone capture by sending START_MIC to the hidden mic window
+ * Get the mic window instance
  */
-function startMicCapture() {
+function getMicWindow() {
+  return micWindow
+}
+
+/**
+ * Start audio capture by sending START_MIC to the hidden mic window.
+ * Uses desktopCapturer - no device selection needed.
+ */
+function startMicCapture(opts = {}) {
   const win = createMicWindow()
-  // Wait for the page to finish loading before sending the message
+  const sendStart = () => {
+    console.log('Mic window loaded, sending START_MIC', opts)
+    win.webContents.send('START_MIC', opts)
+  }
   if (win.webContents.isLoading()) {
-    win.webContents.once('did-finish-load', () => {
-      console.log('Mic window loaded, sending START_MIC')
-      win.webContents.send('START_MIC')
-    })
+    win.webContents.once('did-finish-load', sendStart)
   } else {
-    console.log('Mic window ready, sending START_MIC')
-    win.webContents.send('START_MIC')
+    sendStart()
   }
 }
 
@@ -87,4 +110,4 @@ function destroyMicWindow() {
   }
 }
 
-export { createMicWindow, startMicCapture, stopMicCapture, destroyMicWindow }
+export { createMicWindow, getMicWindow, startMicCapture, stopMicCapture, destroyMicWindow }

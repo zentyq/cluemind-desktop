@@ -29,6 +29,8 @@ export default defineConfig({
         input: {
           overlay: resolve(__dirname, 'src/renderer/overlay/index.html'),
           settings: resolve(__dirname, 'src/renderer/settings/index.html'),
+          login: resolve(__dirname, 'src/renderer/login/index.html'),
+          splash: resolve(__dirname, 'src/renderer/splash/index.html'),
           mic: resolve(__dirname, 'src/renderer/mic/index.html')
         }
       }

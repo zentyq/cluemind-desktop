@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -24,7 +25,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: dist/*.exe
+          path: dist/ClueMind-Setup.exe
+          if-no-files-found: error
 
   build-mac:
     runs-on: macos-latest
@@ -35,13 +37,30 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npx electron-vite build
-      - run: npx electron-builder --mac --publish never
+      # Unsigned DMG for CI — notarization comes later with an Apple Developer account
+      - run: npx electron-builder --mac dmg --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Ensure ClueMind.dmg name
+        run: |
+          ls -la dist || true
+          if [ -f dist/ClueMind.dmg ]; then
+            echo "Found dist/ClueMind.dmg"
+          else
+            DMG=$(ls dist/*.dmg 2>/dev/null | head -n 1)
+            if [ -n "$DMG" ]; then
+              echo "Renaming $DMG -> dist/ClueMind.dmg"
+              mv "$DMG" dist/ClueMind.dmg
+            else
+              echo "No DMG produced"
+              exit 1
+            fi
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: mac-installer
-          path: dist/*.dmg
+          path: dist/ClueMind.dmg
+          if-no-files-found: error
 
   build-linux:
     runs-on: ubuntu-latest
@@ -52,13 +71,14 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npx electron-vite build
-      - run: npx electron-builder --linux --publish never
+      - run: npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: linux-installer
           path: dist/*.AppImage
 
   release:
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-windows, build-mac, build-linux]
     runs-on: ubuntu-latest
     steps:

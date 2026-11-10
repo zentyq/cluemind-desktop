@@ -1,0 +1,46 @@
+CLUEMIND END USER LICENSE AGREEMENT
+
+IMPORTANT - PLEASE READ CAREFULLY BEFORE INSTALLING OR USING CLUEMIND.
+
+By clicking "I Agree", installing, or using ClueMind, you agree to the following terms. If you do not agree, click "Cancel" and do not install or use the software.
+
+1. LICENSE KEY REQUIRED
+   ClueMind requires a valid license key issued from your ClueMind account on the official website.
+   Download alone does not grant the right to use the software. Without a valid license key,
+   the application will not start or operate.
+
+2. ACCOUNT REGISTRATION
+   You must create an account on the ClueMind website and generate a license key from your dashboard
+   before you can activate and use the desktop application.
+
+3. PERMITTED USE
+   Subject to a valid license, ClueMind grants you a limited, non-exclusive, non-transferable right
+   to install and use the software for personal or internal business purposes in accordance with
+   your subscription plan.
+
+4. RESTRICTIONS
+   You may not reverse engineer, decompile, rent, sell, sublicense, or redistribute the software
+   except as expressly allowed by law. You may not share, publish, or sell license keys.
+
+5. CLOUD SERVICES
+   AI and speech features are provided through ClueMind servers using administrator-configured keys.
+   End users are not provided with, and must not attempt to configure, third-party API keys in the app.
+
+6. NO WARRANTY
+   The software is provided "as is" without warranties of any kind, express or implied, including
+   merchantability or fitness for a particular purpose, to the maximum extent permitted by law.
+
+7. LIMITATION OF LIABILITY
+   To the maximum extent permitted by law, ClueMind and its operators shall not be liable for any
+   indirect, incidental, special, or consequential damages arising from use of the software.
+
+8. TERMINATION
+   Your right to use the software ends if your license is revoked, expires, or you breach these terms.
+   Upon termination you must stop using and uninstall the software.
+
+9. UPDATES
+   We may update this agreement and the software from time to time. Continued use after updates
+   constitutes acceptance of the revised terms.
+
+By selecting "I Agree", you confirm that you understand a license key is mandatory and that you
+accept this agreement in full.

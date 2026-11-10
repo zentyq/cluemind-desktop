@@ -1,39 +1,105 @@
 {
   "name": "cluemind-desktop",
-  "version": "1.0.0",
-  "description": "ClueMind AI Assistant - Real-time AI assistant for meetings, interviews, and screen analysis",
+  "version": "1.2.2",
+  "description": "ClueMind - live AI for interviews and meetings",
   "main": "./out/main/index.js",
   "author": "ClueMind",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build && electron-builder",
+    "build": "electron-vite build && electron-builder --publish never",
     "start": "electron-vite preview",
     "preview": "electron-vite preview"
   },
   "dependencies": {
     "electron-store": "^8.2.0",
-    "node-record-lpcm16": "^1.0.1",
+    "electron-updater": "^6.3.9",
     "ws": "^8.16.0"
   },
   "devDependencies": {
-    "electron": "^28.1.0",
-    "electron-vite": "^2.0.0",
-    "electron-builder": "^24.9.1",
     "@electron-toolkit/preload": "^3.0.0",
-    "@electron-toolkit/utils": "^3.0.0"
+    "@electron-toolkit/utils": "^3.0.0",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "electron-vite": "^2.0.0",
+    "rcedit": "^5.0.2"
   },
   "build": {
     "appId": "com.cluemind.assistant",
-    "productName": "ClueMind AI Assistant",
+    "productName": "ClueMind",
+    "copyright": "Copyright © ClueMind",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "resources"
     },
+    "files": [
+      "out/**/*",
+      "resources/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "src/renderer/assets/logo.png",
+        "to": "logo.png"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "resources/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "icon": "resources/icon.ico",
+    "afterPack": "./scripts/afterPack.js",
+    "protocols": [
+      {
+        "name": "ClueMind",
+        "schemes": [
+          "cluemind"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://yq6v2sla8zj5kmcicgzes27h.85.190.107.150.sslip.io/api/updates"
+      }
+    ],
     "win": {
-      "target": "nsis"
+      "target": [
+        "nsis"
+      ],
+      "icon": "resources/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ClueMind",
+      "artifactName": "ClueMind-Setup.${ext}",
+      "license": "resources/license.txt",
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico",
+      "displayLanguageSelector": false,
+      "runAfterFinish": true
     },
     "mac": {
-      "target": "dmg"
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "ClueMind.${ext}",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "artifactName": "ClueMind.${ext}",
+      "title": "ClueMind ${version}"
     },
     "linux": {
       "target": "AppImage"

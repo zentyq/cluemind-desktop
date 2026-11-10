@@ -4,130 +4,146 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com wss://api.deepgram.com ws: wss:; media-src 'self' blob: mediastream:;">
-  <title>ClueMind AI Assistant</title>
+  <title>ClueMind</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <link rel="stylesheet" href="overlay.css">
 </head>
 <body>
   <div class="overlay-container" id="overlayContainer">
-    <!-- Header -->
     <div class="header" id="dragHandle">
       <div class="header-left">
         <div class="logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="#7C3AED" stroke-width="2"/>
-            <path d="M8 12l3 3 5-6" stroke="#7C3AED" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <img src="./logo.png" alt="ClueMind" width="22" height="22" />
           <span class="logo-text">ClueMind</span>
         </div>
         <div class="session-timer" id="sessionTimer">00:00</div>
+        <div class="usage-meter" id="usageMeter" title="Remaining quota">AI · STT</div>
+        <div class="stealth-badge active" id="stealthLockBadge" title="Stealth No-Mouse Mode (Ctrl+Shift+C to unlock mouse)">NO-MOUSE · ⌃⇧C</div>
       </div>
       <div class="header-right">
-        <button class="icon-btn" id="minimizeBtn" title="Minimize">
+        <button class="icon-btn" id="minimizeBtn" title="Minimize (Ctrl+Shift+Z)" type="button">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
-        <button class="icon-btn close-btn" id="closeBtn" title="Close">
+        <button class="icon-btn close-btn" id="closeBtn" title="Hide Overlay (Ctrl+Shift+A)" type="button">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
     </div>
 
-    <!-- API Key Warning Banner -->
     <div class="api-banner" id="apiBanner" style="display: none;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>Add API keys in Settings to get started</span>
-      <button class="banner-btn" id="bannerSettingsBtn">Settings</button>
+      <span id="apiBannerText">Activate with a license key to get started</span>
+      <button class="banner-btn" id="bannerLoginBtn" type="button">Activate</button>
+      <button class="banner-btn" id="bannerSettingsBtn" type="button">Settings</button>
     </div>
 
-    <!-- Mode Tabs -->
-    <div class="mode-tabs">
-      <button class="mode-tab active" data-mode="meeting">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Meeting
+    <!-- Compact mode picker (collapsed by default) -->
+    <div class="section-bar mode-bar" id="modeBar">
+      <button class="section-toggle" id="modeToggle" type="button" aria-expanded="false" title="Cycle mode (Ctrl+Shift+M)">
+        <span class="section-label">Mode <kbd class="kbd-hint">⌃⇧M</kbd></span>
+        <span class="section-value" id="modeValue">Meeting</span>
+        <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <button class="mode-tab" data-mode="interview">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-        Interview
-      </button>
-      <button class="mode-tab" data-mode="screen">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Screen
-      </button>
-    </div>
-
-    <!-- Content Area -->
-    <div class="content-area">
-      <!-- Transcript Panel -->
-      <div class="panel transcript-panel">
-        <div class="panel-header">
-          <span class="panel-title">Live Transcript</span>
-          <div class="recording-indicator" id="recordingIndicator" style="display: none;">
-            <span class="recording-dot"></span>
-            <span>Recording</span>
-          </div>
-        </div>
-        <div class="transcript-scroll" id="transcriptScroll">
-          <div class="transcript-empty" id="transcriptEmpty">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            <p>Start a session to see live transcription</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- AI Suggestions Panel -->
-      <div class="panel suggestions-panel">
-        <div class="panel-header">
-          <span class="panel-title">AI Suggestions</span>
-          <span class="suggestion-count" id="suggestionCount">0</span>
-        </div>
-        <div class="suggestions-scroll" id="suggestionsScroll">
-          <div class="suggestions-empty" id="suggestionsEmpty">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            <p>AI suggestions will appear here</p>
-          </div>
-        </div>
-        <div class="chat-input-area">
-          <input type="text" class="chat-input" id="chatInput" placeholder="Ask about the screen capture..." />
-          <button class="chat-send-btn" id="chatSendBtn" title="Send">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          </button>
-        </div>
+      <div class="section-menu" id="modeMenu" hidden>
+        <button class="menu-item active" data-mode="meeting" type="button">Meeting</button>
+        <button class="menu-item" data-mode="interview" type="button">Interview</button>
+        <button class="menu-item" data-mode="screen" type="button">Screen</button>
+        <button class="menu-item" data-mode="mock" type="button">Mock interview</button>
       </div>
     </div>
 
-    <!-- Status Bar -->
+    <div class="workspace" id="workspace">
+      <!-- Transcript accordion -->
+      <section class="acc-panel" data-panel="transcript" id="panelTranscript">
+        <button class="acc-bar" type="button" data-open="transcript" title="Switch panel (Ctrl+Shift+T)">
+          <span class="acc-title">
+            Live Transcript <kbd class="kbd-hint">⌃⇧T</kbd>
+            <span class="recording-indicator" id="recordingIndicator" style="display: none;">
+              <span class="recording-dot"></span>
+              Live
+            </span>
+          </span>
+          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="acc-body">
+          <div class="transcript-scroll" id="transcriptScroll">
+            <div class="transcript-empty" id="transcriptEmpty">
+              <p>Press <strong>Ctrl+Shift+S</strong> to start transcribing live audio without moving your mouse</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI accordion (default active) -->
+      <section class="acc-panel open" data-panel="ai" id="panelAi">
+        <button class="acc-bar" type="button" data-open="ai" title="Switch panel (Ctrl+Shift+T)">
+          <span class="acc-title">
+            AI Workspace
+            <span class="suggestion-count" id="suggestionCount">0</span>
+            <kbd class="kbd-hint">⌃⇧↑↓ Scroll · ⌃⇧Y Copy</kbd>
+          </span>
+          <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="acc-body">
+          <div class="suggestions-scroll" id="suggestionsScroll">
+            <div class="suggestions-empty" id="suggestionsEmpty">
+              <p>Zero-mouse mode active — use <strong>Ctrl+Shift+S</strong> to start, <strong>Ctrl+Shift+Space</strong> to answer, or <strong>Ctrl+Shift+X</strong> to solve screen</p>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Ask ClueMind… (Ctrl+Shift+C to unlock mouse)" autocomplete="off" spellcheck="false" />
+            <button class="chat-send-btn" id="chatSendBtn" title="Send" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
     <div class="status-bar" id="statusBar" style="display: none;">
       <span class="status-text" id="statusText"></span>
     </div>
 
-    <!-- Bottom Toolbar -->
+    <div class="hotkey-strip" id="hotkeyStrip">
+      <span><kbd>⌃⇧S</kbd> Start/Stop</span>
+      <span><kbd>⌃⇧Space</kbd> Ask</span>
+      <span><kbd>⌃⇧X</kbd> Screen</span>
+      <span><kbd>⌃⇧↑↓</kbd> Scroll</span>
+      <span><kbd>⌃⇧Y</kbd> Copy</span>
+      <span><kbd>⌃⌥←↑↓→</kbd> Move</span>
+      <span><kbd>⌃⇧A</kbd> Hide</span>
+      <span><kbd>⌃⇧C</kbd> Mouse</span>
+    </div>
+
     <div class="toolbar">
-      <button class="toolbar-btn primary" id="toggleSessionBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+      <button class="toolbar-btn ask" id="askNowBtn" type="button" title="Ask now (Ctrl+Shift+Space)">
+        Ask <kbd class="kbd-btn">⌃⇧Space</kbd>
+      </button>
+      <button class="toolbar-btn primary" id="toggleSessionBtn" type="button" title="Start / Stop session (Ctrl+Shift+S)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
         <span>Start</span>
+        <kbd class="kbd-btn">⌃⇧S</kbd>
       </button>
-      <button class="toolbar-btn" id="captureScreenBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><circle cx="12" cy="10" r="3"/></svg>
-        <span>Capture</span>
+      <button class="toolbar-btn" id="captureScreenBtn" type="button" title="Capture & solve screen (Ctrl+Shift+X)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><circle cx="12" cy="10" r="3"/></svg>
+        <kbd class="kbd-btn">⌃⇧X</kbd>
       </button>
-      <button class="toolbar-btn" id="clearChatBtn" title="Clear Chat">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+      <button class="toolbar-btn" id="clearChatBtn" type="button" title="Clear chat (Ctrl+Shift+K)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
       </button>
-      <button class="toolbar-btn" id="settingsBtn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <button class="toolbar-btn" id="settingsBtn" type="button" title="Settings (Ctrl+Shift+,)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </div>
   </div>
 
-  <!-- Minimized Pill -->
   <div class="minimized-pill" id="minimizedPill" style="display: none;">
     <span class="pill-mode" id="pillMode">Meeting</span>
     <span class="pill-dot" id="pillDot"></span>
-    <button class="pill-expand" id="pillExpand">
+    <button class="pill-expand" id="pillExpand" type="button">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
     </button>
   </div>

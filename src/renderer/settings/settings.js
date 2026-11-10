@@ -1,179 +1,154 @@
 /**
- * ClueMind AI Assistant - Settings Window Logic
- * Handles API key management and preference configuration
+ * ClueMind Settings - preferences + cloud profile
  */
 
-// ═══ DOM Elements ═══
-const geminiKeyInput = document.getElementById('geminiKey')
-const deepgramKeyInput = document.getElementById('deepgramKey')
 const defaultModeSelect = document.getElementById('defaultMode')
 const interviewLanguageSelect = document.getElementById('interviewLanguage')
+const spokenLanguageSelect = document.getElementById('spokenLanguage')
+const rolePackSelect = document.getElementById('rolePack')
+const audioSourceSelect = document.getElementById('audioSource')
+const autoSuggestSelect = document.getElementById('autoSuggest')
+const resumeText = document.getElementById('resumeText')
+const jobDescription = document.getElementById('jobDescription')
 const saveBtn = document.getElementById('saveBtn')
 const cancelBtn = document.getElementById('cancelBtn')
 const closeBtn = document.getElementById('closeBtn')
-const testGeminiBtn = document.getElementById('testGeminiBtn')
-const testDeepgramBtn = document.getElementById('testDeepgramBtn')
-const geminiTestResult = document.getElementById('geminiTestResult')
-const deepgramTestResult = document.getElementById('deepgramTestResult')
+const licenseBadge = document.getElementById('licenseBadge')
+const licenseHint = document.getElementById('licenseHint')
+const playbookList = document.getElementById('playbookList')
 
-// ═══ Initialization ═══
-
-/**
- * Load saved settings and populate form fields
- */
 async function loadSettings() {
   try {
     const settings = await window.cluemind.getSettings()
-    geminiKeyInput.value = settings.geminiApiKey || ''
-    deepgramKeyInput.value = settings.deepgramApiKey || ''
     defaultModeSelect.value = settings.defaultMode || 'meeting'
     interviewLanguageSelect.value = settings.interviewLanguage || 'javascript'
+    if (spokenLanguageSelect) spokenLanguageSelect.value = settings.spokenLanguage || 'en'
+    if (rolePackSelect) rolePackSelect.value = settings.rolePack || 'swe'
+    if (audioSourceSelect) audioSourceSelect.value = settings.audioSource || 'auto'
+    if (autoSuggestSelect) autoSuggestSelect.value = String(Boolean(settings.autoSuggest))
+    await refreshLicense()
+    await loadProfile()
+    await loadPlaybooks()
   } catch (err) {
     console.error('Failed to load settings:', err)
   }
 }
 
-// ═══ Event Listeners ═══
-
-/**
- * Save settings to electron-store
- */
-saveBtn.addEventListener('click', async () => {
-  const settings = {
-    geminiApiKey: geminiKeyInput.value.trim(),
-    deepgramApiKey: deepgramKeyInput.value.trim(),
-    defaultMode: defaultModeSelect.value,
-    interviewLanguage: interviewLanguageSelect.value
-  }
-
+async function loadProfile() {
   try {
-    await window.cluemind.saveSettings(settings)
+    const data = await window.cluemind.getProfile()
+    if (!data?.success && data?.error) return
+    if (resumeText) resumeText.value = data.resumeText || ''
+    if (jobDescription) jobDescription.value = data.jobDescription || ''
+    if (rolePackSelect && data.rolePack) rolePackSelect.value = data.rolePack
+    if (spokenLanguageSelect && data.language) spokenLanguageSelect.value = data.language
+  } catch (_) { /* ignore */ }
+}
+
+async function loadPlaybooks() {
+  if (!playbookList) return
+  try {
+    const data = await window.cluemind.getPlaybooks()
+    const items = data.playbooks || []
+    playbookList.textContent = items.length
+      ? items.map((p) => p.title).join(' · ')
+      : 'No stories yet. Add one below.'
+  } catch {
+    playbookList.textContent = 'Sign in / activate to sync playbooks.'
+  }
+}
+
+async function refreshLicense() {
+  try {
+    const lic = await window.cluemind.getLicenseStatus()
+    if (lic?.activated) {
+      licenseBadge.textContent = `Licensed · ${(lic.plan || 'active').toUpperCase()}`
+      licenseBadge.className = 'badge badge-on'
+      licenseHint.textContent =
+        'AI and speech run through the ClueMind server using keys set by your admin.'
+    } else {
+      licenseBadge.textContent = 'License required'
+      licenseBadge.className = 'badge badge-off'
+      licenseHint.textContent =
+        'Activate with a license key from your website dashboard before using ClueMind.'
+    }
+  } catch (_) {
+    licenseBadge.textContent = 'License status unknown'
+    licenseBadge.className = 'badge badge-off'
+  }
+}
+
+document.getElementById('changeLicenseBtn')?.addEventListener('click', async () => {
+  try {
+    await window.cluemind.clearLicense()
+  } catch (_) { /* ignore */ }
+  window.cluemind.openLogin({ change: true })
+  window.cluemind.closeWindow()
+})
+
+document.getElementById('checkUpdatesBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('checkUpdatesBtn')
+  btn.textContent = 'Checking…'
+  try {
+    await window.cluemind.checkForUpdates()
+  } finally {
+    btn.textContent = 'Check for updates'
+  }
+})
+
+document.getElementById('openDashboardBtn')?.addEventListener('click', async () => {
+  const settings = await window.cluemind.getSettings()
+  const url = settings.webAppUrl || 'http://localhost:5173/dashboard.html'
+  window.cluemind.openExternal(
+    url.includes('dashboard') ? url : `${url.replace(/\/$/, '')}/dashboard.html`
+  )
+})
+
+document.getElementById('addPlaybookBtn')?.addEventListener('click', async () => {
+  const title = document.getElementById('playbookTitle')?.value || ''
+  const body = document.getElementById('playbookBody')?.value || ''
+  const result = await window.cluemind.addPlaybook({ title, body })
+  if (result.success) {
+    document.getElementById('playbookTitle').value = ''
+    document.getElementById('playbookBody').value = ''
+    await loadPlaybooks()
+  } else {
+    alert(result.error || 'Could not save story')
+  }
+})
+
+saveBtn.addEventListener('click', async () => {
+  try {
+    await window.cluemind.saveSettings({
+      defaultMode: defaultModeSelect.value,
+      interviewLanguage: interviewLanguageSelect.value,
+      spokenLanguage: spokenLanguageSelect?.value,
+      rolePack: rolePackSelect?.value,
+      audioSource: audioSourceSelect?.value,
+      autoSuggest: autoSuggestSelect?.value === 'true'
+    })
+    await window.cluemind.saveProfile({
+      resumeText: resumeText?.value || '',
+      jobDescription: jobDescription?.value || '',
+      rolePack: rolePackSelect?.value,
+      language: spokenLanguageSelect?.value
+    })
     saveBtn.textContent = 'Saved!'
     saveBtn.classList.add('saved')
     setTimeout(() => {
-      saveBtn.textContent = 'Save Settings'
+      saveBtn.textContent = 'Save preferences'
       saveBtn.classList.remove('saved')
-    }, 2000)
+    }, 1600)
   } catch (err) {
     console.error('Failed to save settings:', err)
-    saveBtn.textContent = 'Error!'
+    saveBtn.textContent = 'Error'
     setTimeout(() => {
-      saveBtn.textContent = 'Save Settings'
-    }, 2000)
+      saveBtn.textContent = 'Save preferences'
+    }, 1600)
   }
 })
 
-/**
- * Cancel and close settings window
- */
-cancelBtn.addEventListener('click', () => {
-  window.cluemind.closeWindow()
-})
+cancelBtn.addEventListener('click', () => window.cluemind.closeWindow())
+closeBtn.addEventListener('click', () => window.cluemind.closeWindow())
 
-/**
- * Close settings window via X button
- */
-closeBtn.addEventListener('click', () => {
-  window.cluemind.closeWindow()
-})
-
-/**
- * Toggle password visibility for API key inputs
- */
-document.querySelectorAll('.toggle-vis-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const targetId = btn.dataset.target
-    const input = document.getElementById(targetId)
-    if (input.type === 'password') {
-      input.type = 'text'
-      btn.textContent = 'Hide'
-    } else {
-      input.type = 'password'
-      btn.textContent = 'Show'
-    }
-  })
-})
-
-/**
- * Test Gemini API connection
- */
-testGeminiBtn.addEventListener('click', async () => {
-  const apiKey = geminiKeyInput.value.trim()
-  if (!apiKey) {
-    showTestResult(geminiTestResult, 'Please enter an API key first.', false)
-    return
-  }
-
-  testGeminiBtn.textContent = 'Testing...'
-  testGeminiBtn.disabled = true
-
-  try {
-    const result = await window.cluemind.testGemini(apiKey)
-    if (result.success) {
-      showTestResult(geminiTestResult, result.message, true)
-      testGeminiBtn.classList.add('success')
-    } else {
-      showTestResult(geminiTestResult, result.error, false)
-      testGeminiBtn.classList.add('error')
-    }
-  } catch (err) {
-    showTestResult(geminiTestResult, 'Test failed: ' + err.message, false)
-  } finally {
-    testGeminiBtn.textContent = 'Test'
-    testGeminiBtn.disabled = false
-    setTimeout(() => {
-      testGeminiBtn.classList.remove('success', 'error')
-    }, 3000)
-  }
-})
-
-/**
- * Test Deepgram API connection
- */
-testDeepgramBtn.addEventListener('click', async () => {
-  const apiKey = deepgramKeyInput.value.trim()
-  if (!apiKey) {
-    showTestResult(deepgramTestResult, 'Please enter an API key first.', false)
-    return
-  }
-
-  testDeepgramBtn.textContent = 'Testing...'
-  testDeepgramBtn.disabled = true
-
-  try {
-    const result = await window.cluemind.testDeepgram(apiKey)
-    if (result.success) {
-      showTestResult(deepgramTestResult, result.message, true)
-      testDeepgramBtn.classList.add('success')
-    } else {
-      showTestResult(deepgramTestResult, result.error, false)
-      testDeepgramBtn.classList.add('error')
-    }
-  } catch (err) {
-    showTestResult(deepgramTestResult, 'Test failed: ' + err.message, false)
-  } finally {
-    testDeepgramBtn.textContent = 'Test'
-    testDeepgramBtn.disabled = false
-    setTimeout(() => {
-      testDeepgramBtn.classList.remove('success', 'error')
-    }, 3000)
-  }
-})
-
-/**
- * Show a test result message
- * @param {HTMLElement} el - Result element
- * @param {string} message - Message to display
- * @param {boolean} success - Whether the test was successful
- */
-function showTestResult(el, message, success) {
-  el.textContent = message
-  el.className = 'test-result ' + (success ? 'success' : 'error')
-  setTimeout(() => {
-    el.style.display = 'none'
-    el.className = 'test-result'
-  }, 5000)
-}
-
-// ═══ Start ═══
 loadSettings()

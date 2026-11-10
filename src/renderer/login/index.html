@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activate ClueMind</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #050814;
+      --text: #f3f6ff;
+      --muted: #8b9bb8;
+      --line: rgba(70, 120, 255, 0.22);
+      --accent: #2e6dff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "DM Sans", system-ui, sans-serif; background: transparent; color: var(--text); user-select: none; }
+    .shell {
+      height: 100vh;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% 0%, rgba(46,109,255,0.22), transparent 55%),
+        linear-gradient(180deg, #0d1528, #050814);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .titlebar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; -webkit-app-region: drag; border-bottom: 1px solid var(--line);
+    }
+    .brand { font-weight: 700; letter-spacing: -0.03em; }
+    .title-actions {
+      display: flex; align-items: center; gap: 6px;
+      -webkit-app-region: no-drag;
+    }
+    .win-btn {
+      -webkit-app-region: no-drag;
+      background: transparent; border: 0; color: var(--muted);
+      cursor: pointer; padding: 6px 10px; border-radius: 6px;
+      font: inherit; font-size: 0.85rem; pointer-events: auto;
+    }
+    .win-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .win-btn.quit:hover { background: rgba(251,113,133,0.2); color: #fb7185; }
+    .quit {
+      -webkit-app-region: no-drag; background: transparent; border: 0; color: var(--muted);
+      cursor: pointer; padding: 4px 8px; border-radius: 6px; font: inherit; font-size: 0.85rem;
+    }
+    .quit:hover { background: rgba(251,113,133,0.2); color: #fb7185; }
+    .body {
+      padding: 28px 24px 22px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .mark {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg, #2e6dff, #1e3a8a);
+      display: grid; place-items: center;
+      font-weight: 800; font-size: 0.95rem; margin-bottom: 4px;
+    }
+    h1 { font-size: 1.45rem; letter-spacing: -0.03em; }
+    .muted { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+    label { display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+    input {
+      background: #070b14; border: 1px solid var(--line); border-radius: 10px;
+      padding: 12px 14px; color: var(--text); font: inherit; outline: none;
+      font-family: "JetBrains Mono", monospace; letter-spacing: 0.02em;
+      -webkit-app-region: no-drag; user-select: text;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46,109,255,0.15); }
+    .error { color: #fb7185; font-size: 0.85rem; min-height: 1.2em; }
+    .btn {
+      background: var(--accent); color: #fff; border: 0; border-radius: 999px;
+      padding: 12px 16px; font-weight: 700; font: inherit; cursor: pointer; margin-top: 4px;
+      -webkit-app-region: no-drag;
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .footer-link { text-align: center; font-size: 0.82rem; color: var(--muted); margin-top: auto; padding-top: 8px; }
+    .footer-link button {
+      background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit;
+      -webkit-app-region: no-drag;
+    }
+    @keyframes float-y {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="titlebar">
+      <div class="brand"><img src="./logo.png" alt="" style="width:22px;height:22px;border-radius:6px;object-fit:cover;vertical-align:middle;margin-right:8px;" />ClueMind</div>
+      <div class="title-actions">
+        <button class="win-btn" id="minimizeBtn" type="button" title="Minimize">─</button>
+        <button class="win-btn quit" id="quitBtn" type="button" title="Quit">Quit</button>
+      </div>
+    </div>
+    <div class="body">
+      <img src="./logo.png" alt="ClueMind" style="width:56px;height:56px;border-radius:14px;object-fit:cover;margin-bottom:4px;animation:float-y 2.8s ease-in-out infinite;" />
+      <h1>Enter your license key</h1>
+      <p class="muted">
+        ClueMind will not start until you activate with a key from your website dashboard.
+      </p>
+      <label>License key
+        <input id="licenseKey" type="text" placeholder="CM-XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" autofocus />
+      </label>
+      <div class="error" id="licenseError"></div>
+      <button class="btn" id="activateBtn" type="button">Activate &amp; start →</button>
+      <p class="footer-link">No key yet? <button type="button" id="openDashboard">Generate one on the website</button></p>
+    </div>
+  </div>
+  <script type="module" src="./login.js"></script>
+</body>
+</html>

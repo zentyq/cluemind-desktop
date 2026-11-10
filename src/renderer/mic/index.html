@@ -4,97 +4,186 @@
 <script>
   let mediaStream = null
   let audioContext = null
+  let sourceNode = null
   let workletNode = null
+  let silentGain = null
+  let chunkCount = 0
+  let captureMode = null
 
-  // Register the AudioWorklet processor inline using a Blob URL
-  const processorCode = `
-    class PCMProcessor extends AudioWorkletProcessor {
-      constructor() {
-        super()
-        this._buffer = []
-        this._bufferSize = 0
-        // Send ~250ms of audio at 16kHz = 4000 samples
-        this._targetSamples = 4000
+  // Resample any hardware rate down to 16 kHz PCM16 for Deepgram.
+  const PROCESSOR_CODE = `
+class PCMProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super()
+    this._buffer = new Float32Array(0)
+    this._flushSize = 2048
+    this._targetRate = 16000
+    this._ratio = sampleRate / this._targetRate
+    this._pos = 0
+  }
+  process(inputs) {
+    const input = inputs[0]
+    if (input && input.length > 0 && input[0].length > 0) {
+      const samples = input[0]
+      let mono
+      if (this._ratio <= 1.01) {
+        mono = samples
+      } else {
+        const out = []
+        while (this._pos < samples.length) {
+          out.push(samples[Math.floor(this._pos)])
+          this._pos += this._ratio
+        }
+        this._pos -= samples.length
+        mono = Float32Array.from(out)
       }
 
-      process(inputs) {
-        const input = inputs[0]
-        if (!input || !input[0]) return true
+      const newBuf = new Float32Array(this._buffer.length + mono.length)
+      newBuf.set(this._buffer)
+      newBuf.set(mono, this._buffer.length)
+      this._buffer = newBuf
 
-        const float32 = input[0]
-        const sampleRate = globalThis.sampleRate || 48000
-        const ratio = sampleRate / 16000
-
-        // Downsample to 16kHz and convert to int16
-        const outLen = Math.floor(float32.length / ratio)
-        const samples = new Int16Array(outLen)
-        for (let i = 0; i < outLen; i++) {
-          const srcIdx = Math.floor(i * ratio)
-          const s = Math.max(-1, Math.min(1, float32[srcIdx]))
-          samples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+      while (this._buffer.length >= this._flushSize) {
+        const chunk = this._buffer.slice(0, this._flushSize)
+        this._buffer = this._buffer.slice(this._flushSize)
+        const int16 = new Int16Array(chunk.length)
+        for (let i = 0; i < chunk.length; i++) {
+          const s = Math.max(-1, Math.min(1, chunk[i]))
+          int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
         }
-
-        this._buffer.push(samples)
-        this._bufferSize += samples.length
-
-        if (this._bufferSize >= this._targetSamples) {
-          // Merge and send
-          const merged = new Int16Array(this._bufferSize)
-          let offset = 0
-          for (const chunk of this._buffer) {
-            merged.set(chunk, offset)
-            offset += chunk.length
-          }
-          this.port.postMessage(merged.buffer, [merged.buffer])
-          this._buffer = []
-          this._bufferSize = 0
-        }
-
-        return true
+        this.port.postMessage(int16.buffer, [int16.buffer])
       }
     }
-    registerProcessor('pcm-processor', PCMProcessor)
-  `
+    return true
+  }
+}
+registerProcessor('pcm-processor', PCMProcessor)
+`
 
-  window.micBridge.onStartMic(async () => {
+  async function startSystemAudio() {
+    console.log('[mic-renderer] Trying getDisplayMedia loopback (system / Zoom audio)...')
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: true
+    })
+    const audioTrack = stream.getAudioTracks()[0]
+    if (!audioTrack) {
+      stream.getTracks().forEach(t => t.stop())
+      throw new Error('No system audio track. Enable "Share audio" / check output device.')
+    }
+    // Drop video - we only need loopback audio from Zoom/Meet/etc.
+    stream.getVideoTracks().forEach(t => t.stop())
+    console.log('[mic-renderer] System audio track:', audioTrack.label || '(loopback)')
+    return { stream: new MediaStream([audioTrack]), mode: 'system' }
+  }
+
+  async function startMicrophone() {
+    console.log('[mic-renderer] Falling back to microphone...')
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1
+      },
+      video: false
+    })
+    const audioTrack = stream.getAudioTracks()[0]
+    if (!audioTrack) {
+      stream.getTracks().forEach(t => t.stop())
+      throw new Error('No microphone track available')
+    }
+    console.log('[mic-renderer] Microphone track:', audioTrack.label || '(default mic)')
+    return { stream: new MediaStream([audioTrack]), mode: 'microphone' }
+  }
+
+  async function startPipeline(audioStream, mode) {
+    mediaStream = audioStream
+    captureMode = mode
+
+    // Always tell Deepgram we send 16 kHz - the worklet resamples.
+    window.micBridge.sendSampleRate(16000)
+
+    audioContext = new AudioContext()
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+    console.log('[mic-renderer] AudioContext sampleRate:', audioContext.sampleRate, 'mode:', mode)
+
+    const blob = new Blob([PROCESSOR_CODE], { type: 'application/javascript' })
+    const url = URL.createObjectURL(blob)
+    await audioContext.audioWorklet.addModule(url)
+    URL.revokeObjectURL(url)
+
+    sourceNode = audioContext.createMediaStreamSource(audioStream)
+    workletNode = new AudioWorkletNode(audioContext, 'pcm-processor')
+
+    // Keep the graph alive without playing audio (avoids speaker feedback).
+    silentGain = audioContext.createGain()
+    silentGain.gain.value = 0
+
+    workletNode.port.onmessage = (e) => {
+      const pcm16 = new Uint8Array(e.data)
+      chunkCount++
+      if (chunkCount % 20 === 1) {
+        console.log('[mic-renderer] PCM16 chunk #' + chunkCount + ', bytes: ' + pcm16.byteLength)
+      }
+      window.micBridge.sendAudioData(pcm16)
+    }
+
+    sourceNode.connect(workletNode)
+    workletNode.connect(silentGain)
+    silentGain.connect(audioContext.destination)
+
+    console.log('[mic-renderer] Audio pipeline ready (' + mode + ' -> AudioWorklet -> PCM16 @16kHz)')
+    window.micBridge.micReady(mode)
+  }
+
+  window.micBridge.onStartMic(async (opts) => {
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      })
-      console.log('Permission granted: media')
+      chunkCount = 0
+      let started = null
+      let lastError = null
+      const source = opts.source || 'auto'
 
-      audioContext = new AudioContext()
-      const blob = new Blob([processorCode], { type: 'application/javascript' })
-      const url = URL.createObjectURL(blob)
-      await audioContext.audioWorklet.addModule(url)
-      URL.revokeObjectURL(url)
-
-      const source = audioContext.createMediaStreamSource(mediaStream)
-      workletNode = new AudioWorkletNode(audioContext, 'pcm-processor')
-
-      workletNode.port.onmessage = (e) => {
-        const pcmBuffer = e.data
-        if (pcmBuffer && pcmBuffer.byteLength > 0) {
-          window.micBridge.sendAudioData(new Uint8Array(pcmBuffer))
+      if (source !== 'mic') {
+        try {
+          started = await startSystemAudio()
+        } catch (err) {
+          lastError = err
+          console.warn('[mic-renderer] System audio failed:', err.message)
         }
       }
 
-      source.connect(workletNode)
-      // AudioWorklet doesn't need to connect to destination
-      workletNode.connect(audioContext.destination)
+      if (!started && source !== 'system') {
+        try {
+          started = await startMicrophone()
+        } catch (err) {
+          lastError = err
+          console.error('[mic-renderer] Microphone failed:', err.message)
+        }
+      }
 
-      console.log('AudioWorklet started, sample rate:', audioContext.sampleRate)
-      window.micBridge.micReady()
+      if (!started) {
+        throw lastError || new Error('Could not start audio capture')
+      }
+
+      await startPipeline(started.stream, started.mode)
     } catch (err) {
-      console.error('Mic start error:', err)
-      window.micBridge.micError(err.message)
+      console.error('[mic-renderer] Error:', err)
+      window.micBridge.micError(err.message || String(err))
     }
   })
 
   window.micBridge.onStopMic(() => {
+    console.log('[mic-renderer] STOP_MIC')
     if (workletNode) { workletNode.disconnect(); workletNode = null }
+    if (sourceNode) { sourceNode.disconnect(); sourceNode = null }
+    if (silentGain) { silentGain.disconnect(); silentGain = null }
     if (audioContext) { audioContext.close().catch(() => {}); audioContext = null }
     if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null }
+    chunkCount = 0
+    captureMode = null
   })
 </script>
 </body>
